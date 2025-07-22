@@ -1,0 +1,10 @@
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.log
+*.pem
+target/
+.idea/
+*.iml
+*.class
