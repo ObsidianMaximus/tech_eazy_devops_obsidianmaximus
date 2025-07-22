@@ -1,0 +1,63 @@
+name: Deploy via SSM
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Get Running Instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:Name,Values=techeazy-SSM-Managed-Instance" \
+              "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+
+      - name: Execute Deploy Script via SSM
+        run: |
+          aws ssm send-command \
+            --instance-ids "${{ env.INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --region ap-south-1 \
+            --parameters '{
+              "commands": [
+                "curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/main/deploy.sh -o /tmp/deploy.sh",
+                "chmod +x /tmp/deploy.sh",
+                "/tmp/deploy.sh"
+              ]
+            }'
+      - name: Schedule EventBridge rule to stop instance in 30 minutes
+        run: |
+          RULE_NAME="auto-stop-ec2-${{ env.INSTANCE_ID }}-$(date +%s)"
+          aws events put-rule \
+            --name "$RULE_NAME" \
+            --schedule-expression "rate(30 minutes)" \
+            --state ENABLED \
+            --region ap-south-1
+
+          aws events put-targets \
+            --rule "$RULE_NAME" \
+            --targets "Id"="1","Arn"="arn:aws:lambda:ap-south-1:${{ secrets.AWS_ACCOUNT_ID }}:function:stop-ec2-lambda","Input"="{\"instance_id\": \"${{ env.INSTANCE_ID }}\"}"
+
+          aws lambda add-permission \
+            --function-name "stop-ec2-lambda" \
+            --statement-id "$RULE_NAME" \
+            --action "lambda:InvokeFunction" \
+            --principal "events.amazonaws.com" \
+            --source-arn "arn:aws:events:ap-south-1:${{ secrets.AWS_ACCOUNT_ID }}:rule/$RULE_NAME" \
+            --region ap-south-1
