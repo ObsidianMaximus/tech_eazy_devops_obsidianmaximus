@@ -36,7 +36,7 @@ jobs:
             --region ap-south-1 \
             --parameters '{
               "commands": [
-                "curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/main/deploy.sh -o /tmp/deploy.sh",
+                "curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/master/deploy.sh -o /tmp/deploy.sh",
                 "chmod +x /tmp/deploy.sh",
                 "/tmp/deploy.sh"
               ]
