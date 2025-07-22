@@ -41,24 +41,31 @@ jobs:
                 "/tmp/deploy.sh"
               ]
             }'
+
       - name: Schedule EventBridge rule to stop instance in 30 minutes
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          INSTANCE_ID: ${{ env.INSTANCE_ID }}
         run: |
-          RULE_NAME="auto-stop-ec2-${{ env.INSTANCE_ID }}-$(date +%s)"
+          RULE_NAME="auto-stop-ec2-${INSTANCE_ID}-$(date +%s)"
+          # Create EventBridge rule
           aws events put-rule \
             --name "$RULE_NAME" \
             --schedule-expression "rate(30 minutes)" \
             --state ENABLED \
             --region ap-south-1
 
+          # Attach target (Lambda) to rule
           aws events put-targets \
             --rule "$RULE_NAME" \
-            --targets "[{\"Id\":\"1\",\"Arn\":\"arn:aws:lambda:ap-south-1:${{ secrets.AWS_ACCOUNT_ID }}:function:stop-ec2-lambda\",\"Input\":\"{\\\"instance_id\\\": \\\"${{ env.INSTANCE_ID }}\\\"}\"}]" \
+            --targets "[{\"Id\":\"1\",\"Arn\":\"arn:aws:lambda:ap-south-1:${AWS_ACCOUNT_ID}:function:stop-ec2-lambda\",\"Input\":\"{\\\"instance_id\\\": \\\"${INSTANCE_ID}\\\"}\"}]" \
             --region ap-south-1
-  
+
+          # Add invoke permission to Lambda for EventBridge rule
           aws lambda add-permission \
             --function-name "stop-ec2-lambda" \
-            --statement-id "$RULE_NAME" \
+            --statement-id "${RULE_NAME}" \
             --action "lambda:InvokeFunction" \
             --principal "events.amazonaws.com" \
-            --source-arn "arn:aws:events:ap-south-1:${{ secrets.AWS_ACCOUNT_ID }}:rule/$RULE_NAME" \
+            --source-arn "arn:aws:events:ap-south-1:${AWS_ACCOUNT_ID}:rule/${RULE_NAME}" \
             --region ap-south-1
