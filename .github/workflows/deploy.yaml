@@ -56,11 +56,11 @@ jobs:
 
           aws events put-targets \
             --rule "$RULE_NAME" \
-            --targets "[{\"Id\":\"1\",\"Arn\":\"arn:aws:lambda:ap-south-1:${AWS_ACCOUNT_ID}:function:stop-ec2-lambda\",\"Input\":\"{\\\"instance_id\\\": \\\"${INSTANCE_ID}\\\"}\"}]" \
+            --targets "[{\"Id\":\"1\",\"Arn\":\"arn:aws:lambda:ap-south-1:${AWS_ACCOUNT_ID}:function:lambda_function\",\"Input\":\"{\\\"instance_id\\\": \\\"${INSTANCE_ID}\\\"}\"}]" \
             --region ap-south-1
 
           aws lambda add-permission \
-            --function-name "stop-ec2-lambda" \
+            --function-name "lambda_function" \
             --statement-id "${RULE_NAME}" \
             --action "lambda:InvokeFunction" \
             --principal "events.amazonaws.com" \

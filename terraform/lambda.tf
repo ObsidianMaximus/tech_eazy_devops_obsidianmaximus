@@ -40,12 +40,12 @@ resource "aws_iam_role_policy" "lambda_ec2_stop_policy" {
 }
 
 resource "aws_lambda_function" "stop_ec2" {
-  filename         = "${path.module}/stop_ec2_lambda.zip"
-  function_name    = "stop-ec2-lambda"
+  filename         = "${path.module}/lambda.zip"
+  function_name    = "lambda_function"
   role             = aws_iam_role.lambda_ec2_stop_role.arn
   handler          = "lambda_function.lambda_handler"
   runtime          = "python3.9"
-  source_code_hash = filebase64sha256("${path.module}/stop_ec2_lambda.zip")
+  source_code_hash = filebase64sha256("${path.module}/lambda.zip")
 
   environment {
     variables = {
