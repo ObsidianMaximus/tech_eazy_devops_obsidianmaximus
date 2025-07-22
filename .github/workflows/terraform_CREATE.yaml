@@ -37,7 +37,7 @@ jobs:
       - name: Zip Lambda function
         run: |
           cd terraform
-          zip -r stop_ec2_lambda.zip stop_ec2_lambda.py
+          zip -r lambda.zip lambda_function.py
         shell: bash
 
       - name: Terraform Apply (auto-approve)
