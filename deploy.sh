@@ -9,7 +9,7 @@
 # -e: exit immediately if a command exits with a non-zero status.
 # -x: print each command to stderr before executing it.
 set -ex
-
+exec > >(sudo tee -a /tmp/deploy_output.log) 2>&1
 # --- Variables and Input Validation ---
 STAGE=$1
 S3_BUCKET_NAME=$2
