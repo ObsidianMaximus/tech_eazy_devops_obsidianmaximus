@@ -2,8 +2,8 @@ name: Terraform Apply
 
 on:
   push:
-    paths:
-      - 'terraform/**'
+    branches:
+      - feature/assignment-2-s3-logging
   workflow_dispatch:
     inputs:
       stage:
@@ -14,6 +14,9 @@ on:
         options:
         - dev
         - prod
+      s3_bucket_name:
+        description: 'A globally unique name for the S3 log bucket (e.g., my-unique-logs-12345)'
+        required: true
 
 jobs:
   terraform:
@@ -21,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ap-south-1
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -46,6 +50,12 @@ jobs:
         shell: bash
 
       - name: Terraform Apply (auto-approve)
-        # Use the -var-file flag to load the correct environment config file
-        run: terraform apply -var-file="${{ github.event.inputs.stage }}_config.tfvars" -auto-approve
+        # This is the key change. We now pass two variables to Terraform:
+        # 1. The config file for the selected stage (e.g., dev_config.tfvars).
+        # 2. The bucket name provided in the workflow inputs.
+        run: |
+          terraform apply \
+            -var-file="${{ github.event.inputs.stage }}_config.tfvars" \
+            -var="s3_bucket_name=${{ github.event.inputs.s3_bucket_name }}" \
+            -auto-approve
         working-directory: terraform
