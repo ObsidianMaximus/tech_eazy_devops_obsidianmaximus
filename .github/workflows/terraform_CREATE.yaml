@@ -3,17 +3,24 @@ name: Terraform Apply
 on:
   push:
     paths:
-      - 'terraform/**'  # Runs only if Terraform files change
+      - 'terraform/**'
   workflow_dispatch:
-    
+    inputs:
+      stage:
+        description: 'The environment to apply (dev or prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
+
 jobs:
   terraform:
     name: Terraform Init & Apply
     runs-on: ubuntu-latest
-
     env:
       AWS_REGION: ap-south-1
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -27,8 +34,6 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
 
       - name: Terraform Init
         run: terraform init
@@ -41,5 +46,6 @@ jobs:
         shell: bash
 
       - name: Terraform Apply (auto-approve)
-        run: terraform apply -auto-approve
+        # Use the -var-file flag to load the correct environment config file
+        run: terraform apply -var-file="${{ github.event.inputs.stage }}_config.tfvars" -auto-approve
         working-directory: terraform
