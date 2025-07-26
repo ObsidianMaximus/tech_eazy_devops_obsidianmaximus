@@ -3,15 +3,35 @@ name: Deploy and Verify via SSM
 on:
   push:
     branches:
-      - master
+      - feature/assignment-2-s3-logging
   workflow_dispatch:
+    inputs:
+      stage:
+        description: 'The stage to deploy (dev or prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
+      s3_bucket_name:
+        description: 'The S3 bucket name where logs will be stored'
+        required: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Add necessary permissions for assuming an IAM role
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -33,58 +53,69 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ env.INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
-            --query "Command.CommandId" \
-            --output text \
+            --query "Command.CommandId" --output text \
             --parameters '{
               "commands": [
-                "curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/master/deploy.sh -o /tmp/deploy.sh",
+                "curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/feature/assignment-2-s3-logging/deploy.sh -o /tmp/deploy.sh",
                 "chmod +x /tmp/deploy.sh",
-                "/tmp/deploy.sh"
+                "/tmp/deploy.sh ${{ github.event.inputs.stage }} ${{ github.event.inputs.s3_bucket_name }}"
               ]
             }')
           echo "COMMAND_ID=$COMMAND_ID" >> $GITHUB_ENV
-          echo "SSM Command sent with ID: $COMMAND_ID"
 
       - name: Wait for SSM Command to Complete
         run: |
-          echo "Waiting for SSM command to complete..."
-          aws ssm wait command-executed \
-            --command-id "${{ env.COMMAND_ID }}" \
-            --instance-id "${{ env.INSTANCE_ID }}"
-          
-          # Explicitly check the final status
-          STATUS=$(aws ssm get-command-invocation \
-            --command-id "${{ env.COMMAND_ID }}" \
-            --instance-id "${{ env.INSTANCE_ID }}" \
-            --query "Status" --output text)
-
+          aws ssm wait command-executed --command-id "${{ env.COMMAND_ID }}" --instance-id "${{ env.INSTANCE_ID }}"
+          STATUS=$(aws ssm get-command-invocation --command-id "${{ env.COMMAND_ID }}" --instance-id "${{ env.INSTANCE_ID }}" --query "Status" --output text)
           if [ "$STATUS" != "Success" ]; then
-            echo "SSM command execution failed with status: $STATUS"
-            # Optional: Get error logs
+            echo "::error::SSM command failed with status: $STATUS"
             aws ssm get-command-invocation --command-id "${{ env.COMMAND_ID }}" --instance-id "${{ env.INSTANCE_ID }}" --query "StandardErrorContent"
             exit 1
           fi
-          echo "SSM command executed successfully."
 
       - name: Health Check Application Endpoint
         run: |
           echo "Waiting for application to become available..."
-          for i in {1..15}; do
-            # Use -sL to be silent and follow redirects, --fail to exit on HTTP error
+          for i in {1..18}; do
             if curl -sL --fail "http://${{ env.PUBLIC_IP }}:80/hello" | grep -q "Hello from Spring MVC!"; then
               echo "Health check PASSED. Application is up and running."
               exit 0
             fi
-            echo "Attempt $i/15 failed. Retrying in 10 seconds..."
+            echo "Attempt $i/18 failed. Retrying in 10 seconds..."
             sleep 10
           done
-          echo "Health check FAILED. The application is not responding correctly."
+          echo "::error::Health check FAILED. The application did not respond correctly."
           exit 1
 
-      - name: Schedule EventBridge rule to stop instance in 30 minutes
-        env:
-          INSTANCE_ID: ${{ env.INSTANCE_ID }}
+      - name: Verify Logs in S3 with Read-Only Role
         run: |
+          echo "--- Verifying log upload with read-only role ---"
+          ROLE_TO_ASSUME_ARN=$(aws iam get-role --role-name techeazy-s3-read-only-role --query "Role.Arn" --output text)
+          
+          # Assume the read-only role and get temporary credentials
+          TEMP_CREDS=$(aws sts assume-role --role-arn "${ROLE_TO_ASSUME_ARN}" --role-session-name "GitHubActions-S3-Verify-Logs")
+          
+          # Export the temporary credentials as environment variables for the next command
+          export AWS_ACCESS_KEY_ID=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.SessionToken')
+          
+          echo "Listing files in s3://${{ github.event.inputs.s3_bucket_name }}/app-logs/"
+          # Use the temporary credentials to list the S3 bucket contents
+          aws s3 ls "s3://${{ github.event.inputs.s3_bucket_name }}/app-logs/"
+          
+          if [ $? -eq 0 ]; then
+            echo "--- Verification SUCCESS: Read-only role can list files. ---"
+          else
+            echo "--- Verification FAILED: Read-only role could not list files. ---"
+            exit 1
+          fi
+
+      - name: Schedule EventBridge rule to stop instance
+        # This step runs only if the previous steps were successful
+        if: success()
+        run: |
+          # ... (The rest of the auto-stop logic remains the same)
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           RULE_NAME="auto-stop-ec2-${INSTANCE_ID}-$(date +%s)"
           aws events put-rule \
