@@ -30,8 +30,8 @@ resource "aws_iam_instance_profile" "ssm_instance_profile" {
   role = aws_iam_role.ssm_role.name
 }
 
-resource "aws_security_group" "allow_http_ssh" {
-  name        = "allow_http_ssh"
+resource "aws_security_group" "allow_http" {
+  name        = "allow_http"
   description = "Allow HTTP and SSH"
 
   ingress {

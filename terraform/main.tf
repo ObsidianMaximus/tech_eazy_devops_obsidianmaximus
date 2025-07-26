@@ -1,7 +1,7 @@
 resource "aws_instance" "techeazy-devops" {
   ami           = var.ami_number # Ubuntu 24.04
   instance_type = "t2.micro"
-  security_groups = [aws_security_group.allow_http_ssh.name]
+  security_groups = [aws_security_group.allow_http.name]
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   user_data = "${file("userdata.sh")}"
 
