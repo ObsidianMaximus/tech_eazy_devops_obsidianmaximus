@@ -5,7 +5,7 @@ set -e
 REPO_URL="https://github.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus.git"
 APP_DIR="/tmp/app"
 
-# Clean up previous clone if exists
+# Clean up previous clone if it exists
 rm -rf "$APP_DIR"
 
 # Clone the repository
@@ -15,16 +15,8 @@ git clone "$REPO_URL" "$APP_DIR"
 cd "$APP_DIR"
 mvn clean package
 
-# Run the Java application
-sudo nohup java -jar target/techeazy-devops-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
+# Run the Java application in the background
+# The 'nohup' and '&' ensure the app keeps running after the script finishes
+sudo nohup java -jar target/hellomvc-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
 
-# Wait for app to start
-sleep 20
-
-# Test if app is reachable via port 80
-if curl -s --connect-timeout 10 http://localhost:80/ > /dev/null; then
-  echo "App is reachable on port 80"
-else
-  echo "App is NOT reachable on port 80"
-  exit 1
-fi
+echo "Deployment script finished. Application is starting."

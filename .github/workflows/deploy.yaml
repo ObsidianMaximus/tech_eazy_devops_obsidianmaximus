@@ -1,4 +1,4 @@
-name: Deploy via SSM
+name: Deploy and Verify via SSM
 
 on:
   push:
@@ -17,30 +17,69 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Get Running Instance ID
-        id: get-instance
+      - name: Get Running Instance Info
+        id: get-instance-info
         run: |
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters \
-              "Name=tag:Name,Values=techeazy-SSM-Managed-Instance" \
-              "Name=instance-state-name,Values=running" \
-            --query "Reservations[].Instances[].InstanceId" \
-            --output text)
-          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          INSTANCE_DATA=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=techeazy-SSM-Managed-Instance" "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].[InstanceId, PublicIpAddress]" --output text)
+          
+          echo "INSTANCE_ID=$(echo "$INSTANCE_DATA" | awk '{print $1}')" >> $GITHUB_ENV
+          echo "PUBLIC_IP=$(echo "$INSTANCE_DATA" | awk '{print $2}')" >> $GITHUB_ENV
 
       - name: Execute Deploy Script via SSM
+        id: ssm-deploy
         run: |
-          aws ssm send-command \
+          COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ env.INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
-            --region ap-south-1 \
+            --query "Command.CommandId" \
+            --output text \
             --parameters '{
               "commands": [
                 "curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/master/deploy.sh -o /tmp/deploy.sh",
                 "chmod +x /tmp/deploy.sh",
                 "/tmp/deploy.sh"
               ]
-            }'
+            }')
+          echo "COMMAND_ID=$COMMAND_ID" >> $GITHUB_ENV
+          echo "SSM Command sent with ID: $COMMAND_ID"
+
+      - name: Wait for SSM Command to Complete
+        run: |
+          echo "Waiting for SSM command to complete..."
+          aws ssm wait command-executed \
+            --command-id "${{ env.COMMAND_ID }}" \
+            --instance-id "${{ env.INSTANCE_ID }}"
+          
+          # Explicitly check the final status
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "${{ env.COMMAND_ID }}" \
+            --instance-id "${{ env.INSTANCE_ID }}" \
+            --query "Status" --output text)
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "SSM command execution failed with status: $STATUS"
+            # Optional: Get error logs
+            aws ssm get-command-invocation --command-id "${{ env.COMMAND_ID }}" --instance-id "${{ env.INSTANCE_ID }}" --query "StandardErrorContent"
+            exit 1
+          fi
+          echo "SSM command executed successfully."
+
+      - name: Health Check Application Endpoint
+        run: |
+          echo "Waiting for application to become available..."
+          for i in {1..15}; do
+            # Use -sL to be silent and follow redirects, --fail to exit on HTTP error
+            if curl -sL --fail "http://${{ env.PUBLIC_IP }}:80/hello" | grep -q "Hello from Spring MVC!"; then
+              echo "Health check PASSED. Application is up and running."
+              exit 0
+            fi
+            echo "Attempt $i/15 failed. Retrying in 10 seconds..."
+            sleep 10
+          done
+          echo "Health check FAILED. The application is not responding correctly."
+          exit 1
 
       - name: Schedule EventBridge rule to stop instance in 30 minutes
         env:
