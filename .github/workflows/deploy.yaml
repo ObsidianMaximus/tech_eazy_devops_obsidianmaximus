@@ -1,3 +1,14 @@
+# ==============================================================================
+# FILE: .github/workflows/deploy.yaml (Updated)
+#
+# ACTION: Replace the entire content of this workflow file.
+#
+# This version hardcodes the S3 bucket name "techeazy-s3-obs".
+#   1. The `s3_bucket_name` input has been removed from `workflow_dispatch`.
+#   2. The hardcoded bucket name is passed directly to the `deploy.sh` script.
+#   3. The hardcoded bucket name is used in the final S3 verification step.
+# ==============================================================================
+
 name: Deploy and Verify via SSM
 
 on:
@@ -14,9 +25,6 @@ on:
         options:
         - dev
         - prod
-      s3_bucket_name:
-        description: 'The S3 bucket name where logs will be stored'
-        required: true
 
 jobs:
   deploy:
@@ -46,7 +54,8 @@ jobs:
       - name: Execute Deploy Script via SSM
         id: ssm-deploy
         run: |
-          COMMAND_ID=$(aws ssm send-command --instance-ids "${{ env.INSTANCE_ID }}" --document-name "AWS-RunShellScript" --query "Command.CommandId" --output text --parameters '{"commands": ["curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/feature/assignment-2-s3-logging/deploy.sh -o /tmp/deploy.sh", "chmod +x /tmp/deploy.sh", "/tmp/deploy.sh ${{ github.event.inputs.stage }} ${{ github.event.inputs.s3_bucket_name }}"]}')
+          # The hardcoded bucket name "techeazy-s3-obs" is now passed as the second argument.
+          COMMAND_ID=$(aws ssm send-command --instance-ids "${{ env.INSTANCE_ID }}" --document-name "AWS-RunShellScript" --query "Command.CommandId" --output text --parameters '{"commands": ["curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/feature/assignment-2-s3-logging/deploy.sh -o /tmp/deploy.sh", "chmod +x /tmp/deploy.sh", "/tmp/deploy.sh ${{ github.event.inputs.stage }} techeazy-s3-obs"]}')
           echo "COMMAND_ID=$COMMAND_ID" >> $GITHUB_ENV
 
       - name: Wait for SSM Command and Check Status
@@ -88,8 +97,9 @@ jobs:
           export AWS_ACCESS_KEY_ID=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.AccessKeyId')
           export AWS_SECRET_ACCESS_KEY=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.SecretAccessKey')
           export AWS_SESSION_TOKEN=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.SessionToken')
-          echo "Listing files in s3://${{ github.event.inputs.s3_bucket_name }}/app-logs/"
-          aws s3 ls "s3://${{ github.event.inputs.s3_bucket_name }}/app-logs/"
+          # The hardcoded bucket name is used here for verification.
+          echo "Listing files in s3://techeazy-s3-obs/app-logs/"
+          aws s3 ls "s3://techeazy-s3-obs/app-logs/"
           if [ $? -eq 0 ]; then
             echo "--- Verification SUCCESS: Read-only role can list files. ---"
           else
