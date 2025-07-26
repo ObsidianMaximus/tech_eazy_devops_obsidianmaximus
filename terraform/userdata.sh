@@ -29,7 +29,7 @@ if [ -z "$S3_BUCKET_NAME" ]; then
 fi
 
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
-LOG_DIR="s3://${S3_BUCKET_NAME}/ec2-system-logs/${TIMESTAMP}"
+LOG_DIR="s3://${S3_BUCKET_NAME}/ec2-system-logs/$TIMESTAMP"
 
 echo "Uploading system logs to ${LOG_DIR}" >> /tmp/shutdown.log
 
@@ -64,3 +64,5 @@ EOF
 
 # Enable the service so it starts automatically on boot and is ready for shutdown.
 sudo systemctl enable upload-logs.service
+
+echo "S3_BUCKET_NAME=${S3_BUCKET_NAME}" | sudo tee /etc/techeazy_env > /dev/null
