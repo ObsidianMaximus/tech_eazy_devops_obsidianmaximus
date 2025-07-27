@@ -1,7 +1,9 @@
 name: Check if the S3 read only role is working properly
 
 on:
-  pull_request:
+  push:
+    branches:
+      - '**'
 
   workflow_dispatch:
     inputs:
