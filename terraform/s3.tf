@@ -13,6 +13,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "expire_logs" {
   rule {
     id = "expire_logs_rule"
 
+    filter {}  # Applies to all objects
+    
     expiration {
       days = 7
     }
