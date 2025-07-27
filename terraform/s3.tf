@@ -87,7 +87,10 @@ resource "aws_iam_policy" "s3_write_policy" {
       {
         Effect    = "Allow",
         Action    = ["s3:PutObject", "s3:CreateBucket"],
-        Resource  = "${aws_s3_bucket.log_bucket.arn}/*"
+        Resource = [
+          "${aws_s3_bucket.log_bucket.arn}/*",
+          aws_s3_bucket.log_bucket.arn
+        ]
       }
     ]
   })

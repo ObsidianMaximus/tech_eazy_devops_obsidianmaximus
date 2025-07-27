@@ -2,7 +2,7 @@ resource "aws_instance" "techeazy-devops" {
   ami           = var.ami_number
   instance_type = var.instance_type # Use the variable here
   security_groups = [aws_security_group.allow_http.name]
-  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
+  iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
   user_data = templatefile("userdata.sh", {
     s3_bucket_name = var.bucket_name
   })
