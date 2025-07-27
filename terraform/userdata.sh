@@ -18,23 +18,48 @@ LOG_DIR="/tmp/ec2-logs-$${TIMESTAMP}"
 cat <<EOF > /opt/upload-logs.sh
 #!/bin/bash
 
+# Exit on any error
+set -e
 
 TIMESTAMP=\$(date +%Y-%m-%d_%H-%M-%S)
-LOG_DIR="/tmp/ec2-logs-\$${TIMESTAMP}"
 
-mkdir -p \$${LOG_DIR}
+# Use /var/tmp instead of /tmp as it's less likely to be read-only during shutdown
+LOG_DIR="/var/tmp/ec2-logs-\$${TIMESTAMP}"
+ARCHIVE_PATH="/var/tmp/ec2-logs-\$${TIMESTAMP}.tar.gz"
 
-# List of logs to archive
-cp /var/log/cloud-init.log \$${LOG_DIR}/ || true
-cp /var/log/cloud-init-output.log \$${LOG_DIR}/ || true
-cp /var/log/syslog \$${LOG_DIR}/ || true
-# Add more logs here if needed
+# Create directory
+mkdir -p "\$${LOG_DIR}"
+
+# List of logs to archive (with error handling)
+echo "Collecting log files..."
+cp /var/log/cloud-init.log "\$${LOG_DIR}/" 2>/dev/null || echo "Warning: cloud-init.log not found"
+cp /var/log/cloud-init-output.log "\$${LOG_DIR}/" 2>/dev/null || echo "Warning: cloud-init-output.log not found"
+cp /var/log/syslog "\$${LOG_DIR}/" 2>/dev/null || echo "Warning: syslog not found"
+
+# Check if any files were copied
+if [ ! "\$(ls -A \$${LOG_DIR})" ]; then
+    echo "Error: No log files found to archive"
+    exit 1
+fi
 
 # Compress logs
-tar -czf \$${LOG_DIR}.tar.gz -C /tmp \$(basename \$${LOG_DIR})
+echo "Compressing logs..."
+tar -czf "\$${ARCHIVE_PATH}" -C /var/tmp "\$(basename \$${LOG_DIR})"
+
+# Verify archive was created
+if [ ! -f "\$${ARCHIVE_PATH}" ]; then
+    echo "Error: Failed to create archive"
+    exit 1
+fi
 
 # Upload to S3
-aws s3 cp \$${LOG_DIR}.tar.gz s3://${s3_bucket_name}/ec2-logs/log-\$${TIMESTAMP}.tar.gz
+echo "Uploading to S3..."
+aws s3 cp "\$${ARCHIVE_PATH}" "s3://${s3_bucket_name}/ec2-logs/log-\$${TIMESTAMP}.tar.gz"
+
+# Clean up
+rm -rf "\$${LOG_DIR}" "\$${ARCHIVE_PATH}"
+
+echo "Log upload completed successfully"
 EOF
 
 chmod +x /opt/upload-logs.sh
@@ -43,12 +68,17 @@ chmod +x /opt/upload-logs.sh
 echo "[Unit]
 Description=Upload EC2 logs to S3 before shutdown
 DefaultDependencies=no
+After=network.target
 Before=shutdown.target reboot.target halt.target
+Conflicts=shutdown.target reboot.target halt.target
 
 [Service]
 Type=oneshot
 ExecStart=/opt/upload-logs.sh
+TimeoutStartSec=300
 RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target" > /etc/systemd/system/upload-logs.service
