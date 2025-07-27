@@ -54,7 +54,15 @@ fi
 
 # Upload to S3
 echo "Uploading to S3..."
-aws s3 cp "\$${ARCHIVE_PATH}" "s3://${s3_bucket_name}/ec2-logs/log-\$${TIMESTAMP}.tar.gz"
+aws s3 cp "\$${ARCHIVE_PATH}" "s3://${s3_bucket_name}/ec2-logs/log-\$${TIMESTAMP}.tar.gz" || {
+    echo "S3 upload failed. Checking AWS configuration..."
+    echo "AWS CLI version: \$(aws --version)"
+    echo "Current AWS identity:"
+    aws sts get-caller-identity || echo "Failed to get AWS identity"
+    echo "Checking S3 bucket access:"
+    aws s3 ls s3://${s3_bucket_name}/ --max-items 1 || echo "Failed to list S3 bucket"
+    exit 1
+}
 
 # Clean up
 rm -rf "\$${LOG_DIR}" "\$${ARCHIVE_PATH}"
