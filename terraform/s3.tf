@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_s3_bucket" "log_bucket" {
   bucket = var.bucket_name
   force_destroy = true
@@ -62,13 +64,13 @@ resource "aws_iam_role" "s3_read_role" {
     Statement = [
       {
         Effect    = "Allow",
-            Principal = {
-            Service = "ec2.amazonaws.com"
-            },
-            Action    = "sts:AssumeRole"
-        }
-        ]
-    })
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        },
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "s3_read_policy_attachment" {
