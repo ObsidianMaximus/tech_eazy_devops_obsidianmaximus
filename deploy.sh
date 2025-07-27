@@ -42,7 +42,7 @@ APP_PID=$!
 echo "Application started with PID: $APP_PID"
 
 # Wait a few seconds for the app to generate some logs
-sleep 10
+sleep 5
 
 # Function to upload logs to S3
 upload_logs() {
