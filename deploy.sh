@@ -1,10 +1,15 @@
 #!/bin/bash
 set -e
 
+# Enable verbose output
+set -x
+
 # Variables
 REPO_URL="https://github.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus.git"
 APP_DIR="/tmp/app"
 LOG_DIR="/tmp/app-logs"
+
+echo "=== DEPLOY SCRIPT STARTED at $(date) ==="
 
 # S3_BUCKET_NAME should be passed as environment variable from GitHub Actions
 if [ -z "$S3_BUCKET_NAME" ]; then
@@ -37,7 +42,7 @@ APP_PID=$!
 echo "Application started with PID: $APP_PID"
 
 # Wait a few seconds for the app to generate some logs
-sleep 60
+sleep 10
 
 # Function to upload logs to S3
 upload_logs() {
@@ -77,3 +82,4 @@ upload_logs
 echo "Deployment script finished. Application is running with PID: $APP_PID"
 echo "Logs are being captured in: $LOG_DIR/app.log"
 echo "Application logs have been uploaded to S3 bucket: $S3_BUCKET_NAME/app/logs/"
+echo "=== DEPLOY SCRIPT COMPLETED at $(date) ==="
