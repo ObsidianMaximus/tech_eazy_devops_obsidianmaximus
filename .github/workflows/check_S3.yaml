@@ -1,6 +1,8 @@
 name: Check if the S3 read only role is working properly
 
 on:
+  pull_request:
+
   workflow_dispatch:
     inputs:
       bucket_name:
@@ -17,7 +19,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
-          
+
       - name: Verify S3 Log Uploads (Read-Only Access)
         run: |
           echo "=== VERIFYING S3 LOG UPLOADS ==="
