@@ -11,7 +11,7 @@ sudo ./aws/install
 
 S3_BUCKET="${s3_bucket_name}"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
-LOG_DIR="/tmp/ec2-logs-${TIMESTAMP}"
+LOG_DIR="/tmp/ec2-logs-\${TIMESTAMP}"
 
 
 # Create shutdown script
