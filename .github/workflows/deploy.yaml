@@ -29,6 +29,8 @@ jobs:
 
       - name: Execute Deploy Script via SSM
         id: ssm-deploy
+        env:
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
         run: |
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ env.INSTANCE_ID }}" \
@@ -37,6 +39,7 @@ jobs:
             --output text \
             --parameters '{
               "commands": [
+                "export S3_BUCKET_NAME=\"${{ secrets.S3_BUCKET_NAME }}\"",
                 "curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/master/deploy.sh -o /tmp/deploy.sh",
                 "chmod +x /tmp/deploy.sh",
                 "/tmp/deploy.sh"
