@@ -11,26 +11,30 @@ sudo ./aws/install
 
 S3_BUCKET="${s3_bucket_name}"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
-LOG_DIR="/tmp/ec2-logs-\${TIMESTAMP}"
+LOG_DIR="/tmp/ec2-logs-$${TIMESTAMP}"
 
 
 # Create shutdown script
 cat <<EOF > /opt/upload-logs.sh
 #!/bin/bash
 
-mkdir -p \${LOG_DIR}
+
+TIMESTAMP=\$(date +%Y-%m-%d_%H-%M-%S)
+LOG_DIR="/tmp/ec2-logs-\$${TIMESTAMP}"
+
+mkdir -p \$${LOG_DIR}
 
 # List of logs to archive
-cp /var/log/cloud-init.log \${LOG_DIR}/ || true
-cp /var/log/cloud-init-output.log \${LOG_DIR}/ || true
-cp /var/log/syslog \${LOG_DIR}/ || true
+cp /var/log/cloud-init.log \$${LOG_DIR}/ || true
+cp /var/log/cloud-init-output.log \$${LOG_DIR}/ || true
+cp /var/log/syslog \$${LOG_DIR}/ || true
 # Add more logs here if needed
 
 # Compress logs
-tar -czf \${LOG_DIR}.tar.gz -C /tmp \$(basename \${LOG_DIR})
+tar -czf \$${LOG_DIR}.tar.gz -C /tmp \$(basename \$${LOG_DIR})
 
 # Upload to S3
-aws s3 cp \${LOG_DIR}.tar.gz s3://${s3_bucket_name}/ec2-logs/log-\${TIMESTAMP}.tar.gz
+aws s3 cp \$${LOG_DIR}.tar.gz s3://${s3_bucket_name}/ec2-logs/log-\$${TIMESTAMP}.tar.gz
 EOF
 
 chmod +x /opt/upload-logs.sh
