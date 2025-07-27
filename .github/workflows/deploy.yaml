@@ -1,44 +1,17 @@
-# ==============================================================================
-# FILE: .github/workflows/deploy.yaml (Updated)
-#
-# ACTION: Replace the entire content of this workflow file.
-#
-# This version hardcodes the S3 bucket name "techeazy-s3-obs".
-#   1. The `s3_bucket_name` input has been removed from `workflow_dispatch`.
-#   2. The hardcoded bucket name is passed directly to the `deploy.sh` script.
-#   3. The hardcoded bucket name is used in the final S3 verification step.
-# ==============================================================================
-
 name: Deploy and Verify via SSM
 
 on:
   push:
     branches:
-      - feature/assignment-2-s3-logging
+      - master
   workflow_dispatch:
-    inputs:
-      stage:
-        description: 'The stage to deploy (dev or prod)'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-        - dev
-        - prod
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -47,71 +20,88 @@ jobs:
       - name: Get Running Instance Info
         id: get-instance-info
         run: |
-          INSTANCE_DATA=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=techeazy-SSM-Managed-Instance" "Name=instance-state-name,Values=running" --query "Reservations[].Instances[].[InstanceId, PublicIpAddress]" --output text)
+          INSTANCE_DATA=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=techeazy-SSM-Managed-Instance" "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].[InstanceId, PublicIpAddress]" --output text)
+          
           echo "INSTANCE_ID=$(echo "$INSTANCE_DATA" | awk '{print $1}')" >> $GITHUB_ENV
           echo "PUBLIC_IP=$(echo "$INSTANCE_DATA" | awk '{print $2}')" >> $GITHUB_ENV
 
       - name: Execute Deploy Script via SSM
         id: ssm-deploy
         run: |
-          # The hardcoded bucket name "techeazy-s3-obs" is now passed as the second argument.
-          COMMAND_ID=$(aws ssm send-command --instance-ids "${{ env.INSTANCE_ID }}" --document-name "AWS-RunShellScript" --query "Command.CommandId" --output text --parameters '{"commands": ["curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/feature/assignment-2-s3-logging/deploy.sh -o /tmp/deploy.sh", "chmod +x /tmp/deploy.sh", "/tmp/deploy.sh ${{ github.event.inputs.stage }} techeazy-s3-obs"]}')
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ env.INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --query "Command.CommandId" \
+            --output text \
+            --parameters '{
+              "commands": [
+                "curl -fsSL https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/master/deploy.sh -o /tmp/deploy.sh",
+                "chmod +x /tmp/deploy.sh",
+                "/tmp/deploy.sh"
+              ]
+            }')
           echo "COMMAND_ID=$COMMAND_ID" >> $GITHUB_ENV
+          echo "SSM Command sent with ID: $COMMAND_ID"
 
-      - name: Wait for SSM Command and Check Status
-        id: ssm-check
-        continue-on-error: true
+      - name: Wait for SSM Command to Complete
         run: |
-          aws ssm wait command-executed --command-id "${{ env.COMMAND_ID }}" --instance-id "${{ env.INSTANCE_ID }}"
-          STATUS=$(aws ssm get-command-invocation --command-id "${{ env.COMMAND_ID }}" --instance-id "${{ env.INSTANCE_ID }}" --query "Status" --output text)
-          echo "Final SSM command status: $STATUS"
-          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "Waiting for SSM command to complete..."
+          aws ssm wait command-executed \
+            --command-id "${{ env.COMMAND_ID }}" \
+            --instance-id "${{ env.INSTANCE_ID }}"
+          
+          # Explicitly check the final status
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "${{ env.COMMAND_ID }}" \
+            --instance-id "${{ env.INSTANCE_ID }}" \
+            --query "Status" --output text)
 
-      - name: Get EC2 Logs on Failure
-        if: steps.ssm-check.outputs.status != 'Success'
-        run: |
-          echo "::error::Deployment script failed on EC2. Fetching full log from /tmp/deploy_output.log:"
-          sleep 5
-          aws ssm send-command --instance-ids "${{ env.INSTANCE_ID }}" --document-name "AWS-RunShellScript" --query "StandardOutputContent" --output text --parameters '{"commands": ["cat /tmp/deploy_output.log"]}'
-          exit 1
+          if [ "$STATUS" != "Success" ]; then
+            echo "SSM command execution failed with status: $STATUS"
+            # Optional: Get error logs
+            aws ssm get-command-invocation --command-id "${{ env.COMMAND_ID }}" --instance-id "${{ env.INSTANCE_ID }}" --query "StandardErrorContent"
+            exit 1
+          fi
+          echo "SSM command executed successfully."
 
       - name: Health Check Application Endpoint
         run: |
           echo "Waiting for application to become available..."
-          for i in {1..18}; do
+          for i in {1..15}; do
+            # Use -sL to be silent and follow redirects, --fail to exit on HTTP error
             if curl -sL --fail "http://${{ env.PUBLIC_IP }}:80/hello" | grep -q "Hello from Spring MVC!"; then
-              echo "Health check PASSED."
+              echo "Health check PASSED. Application is up and running."
               exit 0
             fi
-            echo "Attempt $i/18 failed. Retrying in 10 seconds..."
+            echo "Attempt $i/15 failed. Retrying in 10 seconds..."
             sleep 10
           done
-          echo "::error::Health check FAILED."
+          echo "Health check FAILED. The application is not responding correctly."
           exit 1
 
-      - name: Verify Logs in S3 with Read-Only Role
-        run: |
-          echo "--- Verifying log upload with read-only role ---"
-          ROLE_TO_ASSUME_ARN=$(aws iam get-role --role-name techeazy-s3-read-only-role --query "Role.Arn" --output text)
-          TEMP_CREDS=$(aws sts assume-role --role-arn "${ROLE_TO_ASSUME_ARN}" --role-session-name "GitHubActions-S3-Verify-Logs")
-          export AWS_ACCESS_KEY_ID=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.AccessKeyId')
-          export AWS_SECRET_ACCESS_KEY=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.SecretAccessKey')
-          export AWS_SESSION_TOKEN=$(echo "${TEMP_CREDS}" | jq -r '.Credentials.SessionToken')
-          # The hardcoded bucket name is used here for verification.
-          echo "Listing files in s3://techeazy-s3-obs/app-logs/"
-          aws s3 ls "s3://techeazy-s3-obs/app-logs/"
-          if [ $? -eq 0 ]; then
-            echo "--- Verification SUCCESS: Read-only role can list files. ---"
-          else
-            echo "--- Verification FAILED: Read-only role could not list files. ---"
-            exit 1
-          fi
-
-      - name: Schedule EventBridge rule to stop instance
-        if: success()
+      - name: Schedule EventBridge rule to stop instance in 30 minutes
+        env:
+          INSTANCE_ID: ${{ env.INSTANCE_ID }}
         run: |
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          RULE_NAME="auto-stop-ec2-${{ env.INSTANCE_ID }}-$(date +%s)"
-          aws events put-rule --name "$RULE_NAME" --schedule-expression "rate(30 minutes)" --state ENABLED --region ap-south-1
-          aws events put-targets --rule "$RULE_NAME" --targets "[{\"Id\":\"1\",\"Arn\":\"arn:aws:lambda:ap-south-1:${AWS_ACCOUNT_ID}:function:lambda_function\",\"Input\":\"{\\\"instance_id\\\": \\\"${{ env.INSTANCE_ID }}\\\"}\"}]" --region ap-south-1
-          aws lambda add-permission --function-name "lambda_function" --statement-id "${RULE_NAME}" --action "lambda:InvokeFunction" --principal "events.amazonaws.com" --source-arn "arn:aws:events:ap-south-1:${AWS_ACCOUNT_ID}:rule/${RULE_NAME}" --region ap-south-1
+          RULE_NAME="auto-stop-ec2-${INSTANCE_ID}-$(date +%s)"
+          aws events put-rule \
+            --name "$RULE_NAME" \
+            --schedule-expression "rate(30 minutes)" \
+            --state ENABLED \
+            --region ap-south-1
+
+          aws events put-targets \
+            --rule "$RULE_NAME" \
+            --targets "[{\"Id\":\"1\",\"Arn\":\"arn:aws:lambda:ap-south-1:${AWS_ACCOUNT_ID}:function:lambda_function\",\"Input\":\"{\\\"instance_id\\\": \\\"${INSTANCE_ID}\\\"}\"}]" \
+            --region ap-south-1
+
+          aws lambda add-permission \
+            --function-name "lambda_function" \
+            --statement-id "${RULE_NAME}" \
+            --action "lambda:InvokeFunction" \
+            --principal "events.amazonaws.com" \
+            --source-arn "arn:aws:events:ap-south-1:${AWS_ACCOUNT_ID}:rule/${RULE_NAME}" \
+            --region ap-south-1
