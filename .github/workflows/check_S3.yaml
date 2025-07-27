@@ -56,3 +56,4 @@ jobs:
           fi
           
           echo "S3 log verification PASSED - Files are present in the bucket"
+          exit 0
