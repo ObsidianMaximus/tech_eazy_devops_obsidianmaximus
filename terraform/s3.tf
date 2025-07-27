@@ -7,6 +7,14 @@ resource "aws_s3_bucket" "log_bucket" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "log_bucket_versioning" {
+  bucket = aws_s3_bucket.log_bucket.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "expire_logs" {
   bucket = aws_s3_bucket.log_bucket.id
 
@@ -14,7 +22,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "expire_logs" {
     id = "expire_logs_rule"
 
     filter {}  # Applies to all objects
-    
+
     expiration {
       days = 7
     }
