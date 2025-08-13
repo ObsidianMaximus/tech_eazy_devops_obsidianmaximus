@@ -8,3 +8,8 @@ variable "instance_type" {
   type        = string
   default     = "t2.micro" # Default to the smallest size.
 }
+
+variable "bucket_name" {
+  description = "The name of the S3 bucket to create."
+  type        = string
+}

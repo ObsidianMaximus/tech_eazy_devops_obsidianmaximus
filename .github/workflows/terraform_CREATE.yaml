@@ -1,9 +1,6 @@
 name: Terraform Apply
 
 on:
-  push:
-    paths:
-      - 'terraform/**'
   workflow_dispatch:
     inputs:
       stage:
@@ -14,6 +11,9 @@ on:
         options:
         - dev
         - prod
+      bucket_name:
+        description: 'Name of the s3 bucket to create.'
+        required: true
 
 jobs:
   terraform:
@@ -47,5 +47,5 @@ jobs:
 
       - name: Terraform Apply (auto-approve)
         # Use the -var-file flag to load the correct environment config file
-        run: terraform apply -var-file="${{ github.event.inputs.stage }}_config.tfvars" -auto-approve
+        run: terraform apply -var-file="${{ github.event.inputs.stage }}_config.tfvars" -var="bucket_name=${{ github.event.inputs.bucket_name }}" -auto-approve
         working-directory: terraform

@@ -11,3 +11,5 @@ target/
 
 
 nohup.out
+
+.vscode/

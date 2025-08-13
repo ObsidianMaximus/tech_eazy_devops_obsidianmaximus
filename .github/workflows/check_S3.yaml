@@ -1,0 +1,54 @@
+name: Check if the S3 read only role is working properly
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  check_s3:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Verify S3 Log Uploads (Read-Only Access)
+        run: |
+          echo "=== VERIFYING S3 LOG UPLOADS ==="
+          
+          # Get AWS Account ID
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          
+          # Assume the read-only S3 role
+          echo "Assuming S3ReadRole for verification..."
+          ASSUME_ROLE_OUTPUT=$(aws sts assume-role \
+            --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/S3ReadRole" \
+            --role-session-name "s3-log-verification" \
+            --duration-seconds 900)
+          
+          # Set temporary credentials
+          export AWS_ACCESS_KEY_ID=$(echo $ASSUME_ROLE_OUTPUT | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $ASSUME_ROLE_OUTPUT | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $ASSUME_ROLE_OUTPUT | jq -r '.Credentials.SessionToken')
+          
+          # Check for EC2 logs
+          echo "Checking for EC2 logs..."
+          EC2_LOGS=$(aws s3 ls s3://${{ secrets.S3_BUCKET_NAME }}/ec2-logs/ || true)
+          
+          # Check for App logs  
+          echo "Checking for App logs..."
+          APP_LOGS=$(aws s3 ls s3://${{ secrets.S3_BUCKET_NAME }}/app/logs/ || true)
+          
+          # Verify at least one type of logs exists
+          if [ -z "$EC2_LOGS" ] && [ -z "$APP_LOGS" ]; then
+            echo "VERIFICATION FAILED: No log files found in S3 bucket"
+            exit 1
+          fi
+          
+          echo "S3 log verification PASSED - Files are present in the bucket"
+          exit 0

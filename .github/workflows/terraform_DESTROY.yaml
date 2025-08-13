@@ -2,6 +2,18 @@ name: Terraform Cleanup
 
 on:
   workflow_dispatch:
+    inputs:
+      stage:
+        description: 'The environment to apply (dev or prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
+      bucket_name:
+        description: 'Name of the s3 bucket to destroy.'
+        required: true
   
 jobs:
   terraform-cleanup:
@@ -30,5 +42,5 @@ jobs:
       working-directory: terraform
 
     - name: 'Terraform Apply Destroy'
-      run: terraform destroy --auto-approve
+      run: terraform destroy -var-file="${{ github.event.inputs.stage }}_config.tfvars" -var="bucket_name=${{ github.event.inputs.bucket_name }}" --auto-approve
       working-directory: terraform
