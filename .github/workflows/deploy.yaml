@@ -5,6 +5,7 @@ on:
     tags:
       - 'deploy-dev'
       - 'deploy-prod'
+      
   workflow_dispatch:
     inputs:
       stage:
