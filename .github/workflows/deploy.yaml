@@ -2,9 +2,20 @@ name: Deploy and Verify via SSM
 
 on:
   push:
-    branches:
-      - master
+      branches:
+        - 'master'
+        - 'feature/tag-triggers'
+
   workflow_dispatch:
+    inputs:
+      stage:
+        description: 'The environment to deploy to (dev or prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
 
 jobs:
   deploy:
