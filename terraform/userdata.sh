@@ -9,7 +9,7 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip awscliv2.zip
 sudo ./aws/install
 
-S3_BUCKET="${s3_bucket_name}"
+S3_LOG_PATH="${s3_log_path}"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
 LOG_DIR="/tmp/ec2-logs-$${TIMESTAMP}"
 
@@ -52,15 +52,15 @@ if [ ! -f "\$${ARCHIVE_PATH}" ]; then
     exit 1
 fi
 
-# Upload to S3
+# Upload to S3 using stage-specific path
 echo "Uploading to S3..."
-aws s3 cp "\$${ARCHIVE_PATH}" "s3://${s3_bucket_name}/ec2-logs/log-\$${TIMESTAMP}.tar.gz" || {
+aws s3 cp "\$${ARCHIVE_PATH}" "${s3_log_path}ec2-logs/log-\$${TIMESTAMP}.tar.gz" || {
     echo "S3 upload failed. Checking AWS configuration..."
     echo "AWS CLI version: \$(aws --version)"
     echo "Current AWS identity:"
     aws sts get-caller-identity || echo "Failed to get AWS identity"
     echo "Checking S3 bucket access:"
-    aws s3 ls s3://${s3_bucket_name}/ --max-items 1 || echo "Failed to list S3 bucket"
+    aws s3 ls "${s3_log_path}" --max-items 1 || echo "Failed to list S3 path"
     exit 1
 }
 

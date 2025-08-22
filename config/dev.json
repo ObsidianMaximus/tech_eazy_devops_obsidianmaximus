@@ -1,0 +1,3 @@
+{
+  "s3_log_path": "s3://techeazy-feature-logger/logs/dev/"
+}
