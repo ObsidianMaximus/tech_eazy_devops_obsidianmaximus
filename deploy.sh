@@ -15,32 +15,17 @@ fi
 
 echo "=== DEPLOY SCRIPT STARTED for stage: $STAGE at $(date) ==="
 
-# Fetch configuration based on stage
-if [ "$STAGE" = "dev" ]; then
-    echo "Using dev configuration..."
-    if [ ! -f "config/dev.json" ]; then
-        echo "Error: config/dev.json not found"
-        exit 1
-    fi
-    S3_LOG_PATH=$(jq -r '.s3_log_path' "config/dev.json")
-elif [ "$STAGE" = "prod" ]; then
-    echo "Fetching prod configuration..."
-    if [ -n "$GITHUB_TOKEN" ]; then
-        curl -H "Authorization: token $GITHUB_TOKEN" \
-             -H "Accept: application/vnd.github.v3.raw" \
-             -o temp-prod-config.json \
-             "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/config/prod.json"
-        S3_LOG_PATH=$(jq -r '.s3_log_path' "temp-prod-config.json")
-        rm -f temp-prod-config.json
-    else
-        echo "Warning: GITHUB_TOKEN not set, using local prod config"
-        if [ ! -f "config/prod.json" ]; then
-            echo "Error: config/prod.json not found"
-            exit 1
-        fi
-        S3_LOG_PATH=$(jq -r '.s3_log_path' "config/prod.json")
-    fi
+# Fetch configuration based on stage - both from public repo
+echo "Fetching $STAGE configuration from public repo..."
+curl -fsSL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/refs/heads/A4/config/$STAGE.json" -o "temp-config.json"
+
+if [ ! -f "temp-config.json" ]; then
+    echo "Error: Failed to fetch config/$STAGE.json"
+    exit 1
 fi
+
+S3_LOG_PATH=$(jq -r '.s3_log_path' "temp-config.json")
+rm -f temp-config.json
 
 # Extract bucket name from S3 path for backward compatibility
 S3_BUCKET_NAME=$(echo "$S3_LOG_PATH" | sed 's|s3://||' | cut -d'/' -f1)

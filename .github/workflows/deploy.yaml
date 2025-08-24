@@ -21,6 +21,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+
+      - name: Set default stage for push events
+        if: ${{ github.event.inputs.stage == '' }}
+        run: echo "STAGE=dev" >> $GITHUB_ENV
+
+      - name: Set stage from input
+        if: ${{ github.event.inputs.stage != '' }}
+        run: echo "STAGE=${{ github.event.inputs.stage }}" >> $GITHUB_ENV
+      
+      - name: Fetch config for both dev and prod
+        run: |
+          S3_LOG_PATH=$(jq -r '.s3_log_path' config/${{ env.STAGE }}.json)
+          echo "S3_LOG_PATH=$S3_LOG_PATH" >> $GITHUB_ENV
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -41,7 +56,6 @@ jobs:
       - name: Execute Deploy Script via SSM
         id: ssm-deploy
         env:
-          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
           URL: https://raw.githubusercontent.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus/refs/heads/A4/deploy.sh
         run: |
           COMMAND_ID=$(aws ssm send-command \
@@ -51,14 +65,14 @@ jobs:
             --output text \
             --parameters '{
               "commands": [
-                "export S3_BUCKET_NAME=\"${{ secrets.S3_BUCKET_NAME }}\"",
+                "export GITHUB_REPOSITORY=\"${{ github.repository }}\"",
                 "curl -fsSL ${{ env.URL }} -o /tmp/deploy.sh",
                 "chmod +x /tmp/deploy.sh",
-                "/tmp/deploy.sh"
+                "/tmp/deploy.sh ${{ env.STAGE }}"
               ]
             }')
           echo "COMMAND_ID=$COMMAND_ID" >> $GITHUB_ENV
-          echo "SSM Command sent with ID: $COMMAND_ID"
+          echo "SSM Command sent with ID: $COMMAND_ID for stage: ${{ env.STAGE }}"
 
       - name: Wait for SSM Command to Complete
         run: |
