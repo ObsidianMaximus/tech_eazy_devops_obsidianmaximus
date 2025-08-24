@@ -13,3 +13,20 @@ variable "bucket_name" {
   description = "The name of the S3 bucket to create."
   type        = string
 }
+
+variable "stage" {
+  description = "Deployment stage"
+  type        = string
+  default     = "dev"
+
+  validation {
+    condition     = contains(["dev", "prod"], var.stage)
+    error_message = "Stage must be either 'dev' or 'prod'."
+  }
+}
+
+variable "s3_log_path" {
+  description = "S3 path for application logs"
+  type        = string
+  default     = "s3://your-bucket/logs/dev/"
+}

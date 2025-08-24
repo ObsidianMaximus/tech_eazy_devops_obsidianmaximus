@@ -4,11 +4,13 @@ resource "aws_instance" "techeazy-devops" {
   security_groups = [aws_security_group.allow_http.name]
   iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
   user_data = templatefile("userdata.sh", {
-    s3_bucket_name = var.bucket_name
+    s3_log_path = var.s3_log_path
+    stage       = var.stage
   })
 
   tags = {
-    Name = "techeazy-SSM-Managed-Instance"
+    Name = "techeazy-SSM-Managed-Instance-${var.stage}"
+    Stage = var.stage
   }
 }
 
