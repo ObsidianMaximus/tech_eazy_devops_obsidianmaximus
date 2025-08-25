@@ -10,7 +10,6 @@ resource "aws_instance" "techeazy-devops" {
 
   tags = {
     Name = "techeazy-SSM-Managed-Instance"
-    Stage = var.stage
   }
 }
 
