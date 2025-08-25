@@ -47,5 +47,5 @@ jobs:
 
       - name: Terraform Apply (auto-approve)
         # Use the -var-file flag to load the correct environment config file
-        run: terraform apply -var-file="${{ github.event.inputs.stage }}_config.tfvars" -var="bucket_name=${{ github.event.inputs.bucket_name }}" -auto-approve
+        run: terraform apply -var-file="${{ github.event.inputs.stage }}_config.tfvars" -var="bucket_name=${{ github.event.inputs.bucket_name }}" -var="stage=${{ github.event.inputs.stage }}" -auto-approve
         working-directory: terraform

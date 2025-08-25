@@ -5,6 +5,7 @@ resource "aws_instance" "techeazy-devops" {
   iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
   user_data = templatefile("userdata.sh", {
     s3_log_path = var.s3_log_path
+    s3_bucket_name = var.bucket_name
   })
 
   tags = {
