@@ -31,12 +31,12 @@ LOG_DIR="/var/tmp/ec2-logs-\$${TIMESTAMP}"
 ARCHIVE_PATH="/var/tmp/ec2-logs-\$${TIMESTAMP}.tar.gz"
 
 # Check if S3_LOG_PATH is set
-if [ -z "\$S3_LOG_PATH" ]; then
+if [ -z "\$$S3_LOG_PATH" ]; then
     echo "Error: S3_LOG_PATH not set"
     exit 1
 fi
 
-echo "Using S3 log path: \$S3_LOG_PATH"
+echo "Using S3 log path: \$$S3_LOG_PATH"
 
 # Create directory
 mkdir -p "\$${LOG_DIR}"
@@ -71,7 +71,7 @@ aws s3 cp "\$${ARCHIVE_PATH}" "\$${S3_LOG_PATH}ec2-logs/log-\$${TIMESTAMP}.tar.g
     echo "Current AWS identity:"
     aws sts get-caller-identity || echo "Failed to get AWS identity"
     echo "Checking S3 bucket access:"
-    aws s3 ls "\$S3_LOG_PATH" --max-items 1 || echo "Failed to list S3 path"
+    aws s3 ls "\$$S3_LOG_PATH" --max-items 1 || echo "Failed to list S3 path"
     exit 1
 }
 
