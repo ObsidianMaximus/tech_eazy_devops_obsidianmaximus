@@ -4,27 +4,60 @@ set -e
 # Enable verbose output
 set -x
 
-# Variables
-REPO_URL="https://github.com/ObsidianMaximus/tech_eazy_devops_obsidianmaximus.git"
-APP_DIR="/tmp/app"
-LOG_DIR="/tmp/app-logs"
+# Get stage parameter (default to dev)
+STAGE=${1:-dev}
 
-echo "=== DEPLOY SCRIPT STARTED at $(date) ==="
-
-# S3_BUCKET_NAME should be passed as environment variable from GitHub Actions
-if [ -z "$S3_BUCKET_NAME" ]; then
-    echo "Error: S3_BUCKET_NAME environment variable is not set"
-    echo "This script should be called from GitHub Actions with the S3 bucket name"
+# Validate stage
+if [[ "$STAGE" != "dev" && "$STAGE" != "prod" ]]; then
+    echo "Error: Stage must be 'dev' or 'prod'"
     exit 1
 fi
 
+echo "=== DEPLOY SCRIPT STARTED for stage: $STAGE at $(date) ==="
+
+# Fetch configuration based on stage from current repo
+echo "Fetching $STAGE configuration from public repo..."
+curl -fsSL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/refs/heads/A4/config/$STAGE.json" -o "temp-config.json"
+
+if [ ! -f "temp-config.json" ]; then
+    echo "Error: Failed to fetch config/$STAGE.json"
+    exit 1
+fi
+
+S3_LOG_PATH=$(jq -r '.s3_log_path' "temp-config.json")
+rm -f temp-config.json
+
+# Extract bucket name from S3 path for backward compatibility
+S3_BUCKET_NAME=$(echo "$S3_LOG_PATH" | sed 's|s3://||' | cut -d'/' -f1)
+export S3_BUCKET_NAME
+export S3_LOG_PATH
+
+echo "Using S3 log path: $S3_LOG_PATH"
 echo "Using S3 bucket: $S3_BUCKET_NAME"
+
+# Clone repository based on stage
+if [ "$STAGE" = "dev" ]; then
+    echo "Stage is dev, cloning public repo..."
+    REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+else
+    echo "Stage is prod, cloning private repo with token..."
+    if [ -z "$GITHUB_PAT" ]; then
+        echo "Error: GITHUB_PAT not set for prod deployment"
+        exit 1
+    fi
+    REPO_URL="https://x-access-token:$GITHUB_PAT@github.com/${GITHUB_REPOSITORY}.git"
+fi
+
+# Variables
+APP_DIR="/tmp/app"
+LOG_DIR="/tmp/app-logs"
 
 # Clean up previous clone if it exists
 rm -rf "$APP_DIR"
 
 # Clone the repository
-git clone "$REPO_URL" "$APP_DIR"
+echo "Cloning from: $REPO_URL"
+git clone --depth 1 --branch A4 "$REPO_URL" "$APP_DIR"
 
 # Build the project
 cd "$APP_DIR"
@@ -62,12 +95,12 @@ upload_logs() {
     # Create archive
     tar -czf "$log_archive" -C /tmp "$(basename $LOG_DIR)"
     
-    # Upload to S3
+    # Upload to S3 using the stage-specific path
     echo "Uploading logs to S3..."
-    aws s3 cp "$log_archive" "s3://${S3_BUCKET_NAME}/app/logs/app-logs-${timestamp}.tar.gz"
+    aws s3 cp "$log_archive" "${S3_LOG_PATH}app-logs-${timestamp}.tar.gz"
     
     if [ $? -eq 0 ]; then
-        echo "Successfully uploaded logs to s3://${S3_BUCKET_NAME}/app/logs/app-logs-${timestamp}.tar.gz"
+        echo "Successfully uploaded logs to ${S3_LOG_PATH}app-logs-${timestamp}.tar.gz"
     else
         echo "Failed to upload logs to S3"
     fi
@@ -79,7 +112,7 @@ upload_logs() {
 # Upload initial logs
 upload_logs
 
-echo "Deployment script finished. Application is running with PID: $APP_PID"
+echo "Deployment script finished for stage: $STAGE. Application is running with PID: $APP_PID"
 echo "Logs are being captured in: $LOG_DIR/app.log"
-echo "Application logs have been uploaded to S3 bucket: $S3_BUCKET_NAME/app/logs/"
+echo "Application logs have been uploaded to S3 path: $S3_LOG_PATH"
 echo "=== DEPLOY SCRIPT COMPLETED at $(date) ==="
