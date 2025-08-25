@@ -9,8 +9,8 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip awscliv2.zip
 sudo ./aws/install
 
-# Set environment variables from Terraform
-S3_LOG_PATH="${s3_log_path}"
+# Set the S3 log path from Terraform variable
+S3_LOG_PATH="${s3_bucket_name}/logs/${stage}/"
 STAGE="${stage}"
 echo "S3_LOG_PATH=$S3_LOG_PATH" >> /etc/environment
 echo "STAGE=$STAGE" >> /etc/environment
