@@ -65,7 +65,7 @@ fi
 
 # Upload to S3 using stage-specific path
 echo "Uploading to S3..."
-aws s3 cp "\$${ARCHIVE_PATH}" "\${S3_LOG_PATH}ec2-logs/log-\$${TIMESTAMP}.tar.gz" || {
+aws s3 cp "\$${ARCHIVE_PATH}" "\$${S3_LOG_PATH}ec2-logs/log-\$${TIMESTAMP}.tar.gz" || {
     echo "S3 upload failed. Checking AWS configuration..."
     echo "AWS CLI version: \$(aws --version)"
     echo "Current AWS identity:"
