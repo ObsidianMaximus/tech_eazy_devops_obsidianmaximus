@@ -15,7 +15,7 @@ resource "aws_instance" "techeazy-devops" {
   }
 }
 
-resource "aws_iam_instance_profile" "ec2_instance_profile" {
+resource "aws_iam_instance_profile" "s3_instance_profile" {
   name = "S3InstanceProfile"
   role = aws_iam_role.s3_write_role.name
 }
