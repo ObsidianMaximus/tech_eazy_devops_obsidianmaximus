@@ -9,12 +9,11 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip awscliv2.zip
 sudo ./aws/install
 
-# Set the S3 log path from Terraform variable
+# Set the S3 log path from Terraform variable - expand variables immediately
 S3_BUCKET_NAME="${s3_bucket_name}"
 STAGE="${stage}"
-S3_LOG_PATH="s3://\$${S3_BUCKET_NAME}/logs/\$${STAGE}/"
-echo "S3_LOG_PATH=\$${S3_LOG_PATH}" >> /etc/environment
-
+S3_LOG_PATH="s3://${s3_bucket_name}/logs/${stage}"
+echo "S3_LOG_PATH=$S3_LOG_PATH" >> /etc/environment
 
 # Create shutdown script
 cat <<EOF > /opt/upload-logs.sh
@@ -31,12 +30,12 @@ LOG_DIR="/var/tmp/ec2-logs-\$${TIMESTAMP}"
 ARCHIVE_PATH="/var/tmp/ec2-logs-\$${TIMESTAMP}.tar.gz"
 
 # Check if S3_LOG_PATH is set
-if [ -z "\$$S3_LOG_PATH" ]; then
+if [ -z "\$S3_LOG_PATH" ]; then
     echo "Error: S3_LOG_PATH not set"
     exit 1
 fi
 
-echo "Using S3 log path: \$$S3_LOG_PATH"
+echo "Using S3 log path: \$S3_LOG_PATH"
 
 # Create directory
 mkdir -p "\$${LOG_DIR}"
@@ -65,13 +64,13 @@ fi
 
 # Upload to S3 using stage-specific path
 echo "Uploading to S3..."
-aws s3 cp "\$${ARCHIVE_PATH}" "\$${S3_LOG_PATH}ec2-logs/log-\$${TIMESTAMP}.tar.gz" || {
+aws s3 cp "\$${ARCHIVE_PATH}" "\$S3_LOG_PATH/ec2-logs/log-\$${TIMESTAMP}.tar.gz" || {
     echo "S3 upload failed. Checking AWS configuration..."
     echo "AWS CLI version: \$(aws --version)"
     echo "Current AWS identity:"
     aws sts get-caller-identity || echo "Failed to get AWS identity"
     echo "Checking S3 bucket access:"
-    aws s3 ls "\$$S3_LOG_PATH" --max-items 1 || echo "Failed to list S3 path"
+    aws s3 ls "\$S3_LOG_PATH" || echo "Failed to list S3 path"
     exit 1
 }
 
