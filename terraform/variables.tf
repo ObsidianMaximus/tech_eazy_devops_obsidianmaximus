@@ -17,12 +17,6 @@ variable "bucket_name" {
 variable "stage" {
   description = "Deployment stage"
   type        = string
-  default     = "dev"
-
-  validation {
-    condition     = contains(["dev", "prod"], var.stage)
-    error_message = "Stage must be either 'dev' or 'prod'."
-  }
 }
 
 variable "s3_log_path" {
