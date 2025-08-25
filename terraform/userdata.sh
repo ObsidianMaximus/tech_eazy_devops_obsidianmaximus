@@ -9,9 +9,11 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip awscliv2.zip
 sudo ./aws/install
 
-# Set the S3 log path from Terraform variable
+# Set environment variables from Terraform
 S3_LOG_PATH="${s3_log_path}"
+STAGE="${stage}"
 echo "S3_LOG_PATH=$S3_LOG_PATH" >> /etc/environment
+echo "STAGE=$STAGE" >> /etc/environment
 
 # Create shutdown script
 cat <<EOF > /opt/upload-logs.sh

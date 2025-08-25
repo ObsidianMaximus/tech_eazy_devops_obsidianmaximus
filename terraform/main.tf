@@ -4,8 +4,9 @@ resource "aws_instance" "techeazy-devops" {
   security_groups = [aws_security_group.allow_http.name]
   iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
   user_data = templatefile("userdata.sh", {
-    s3_log_path = var.s3_log_path
+    s3_log_path = "s3://${var.bucket_name}/logs/${var.stage}/"
     s3_bucket_name = var.bucket_name
+    stage = var.stage
   })
 
   tags = {
@@ -14,7 +15,7 @@ resource "aws_instance" "techeazy-devops" {
   }
 }
 
-resource "aws_iam_instance_profile" "s3_instance_profile" {
+resource "aws_iam_instance_profile" "ec2_instance_profile" {
   name = "S3InstanceProfile"
   role = aws_iam_role.s3_write_role.name
 }

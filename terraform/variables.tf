@@ -28,5 +28,5 @@ variable "stage" {
 variable "s3_log_path" {
   description = "S3 path for application logs"
   type        = string
-  default     = "s3://your-bucket/logs/dev/"
+  default     = ""
 }
