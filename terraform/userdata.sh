@@ -12,9 +12,9 @@ sudo ./aws/install
 # Set the S3 log path from Terraform variable
 S3_BUCKET_NAME="${s3_bucket_name}"
 STAGE="${stage}"
-S3_LOG_PATH="\$${S3_BUCKET_NAME}/logs/\$${STAGE}/"
+S3_LOG_PATH="s3://\$${S3_BUCKET_NAME}/logs/\$${STAGE}/"
 echo "S3_LOG_PATH=\$${S3_LOG_PATH}" >> /etc/environment
-echo "STAGE=\$${STAGE}" >> /etc/environment
+
 
 # Create shutdown script
 cat <<EOF > /opt/upload-logs.sh
