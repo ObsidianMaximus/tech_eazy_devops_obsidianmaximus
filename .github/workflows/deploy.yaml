@@ -66,6 +66,7 @@ jobs:
             --parameters '{
               "commands": [
                 "export GITHUB_REPOSITORY=\"${{ github.repository }}\"",
+                "export GITHUB_PAT=\"${{ secrets.REPO_READ_ONLY_TOKEN }}\"",
                 "curl -fsSL ${{ env.URL }} -o /tmp/deploy.sh",
                 "chmod +x /tmp/deploy.sh",
                 "/tmp/deploy.sh ${{ env.STAGE }}"
