@@ -42,5 +42,5 @@ jobs:
       working-directory: terraform
 
     - name: 'Terraform Apply Destroy'
-      run: terraform destroy -var-file="${{ github.event.inputs.stage }}_config.tfvars" -var="bucket_name=${{ github.event.inputs.bucket_name }}" --auto-approve
+      run: terraform destroy -var-file="${{ github.event.inputs.stage }}_config.tfvars" -var="bucket_name=${{ github.event.inputs.bucket_name }}" -var="stage=${{ github.event.inputs.stage }}" --auto-approve
       working-directory: terraform
