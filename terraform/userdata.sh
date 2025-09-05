@@ -9,6 +9,70 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip awscliv2.zip
 sudo ./aws/install
 
+# Setup CloudWatch agent
+echo "Installing CloudWatch agent..."
+wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+sudo systemctl enable amazon-cloudwatch-agent
+
+echo "Writing CloudWatch agent config..."
+sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
+
+# Create optimized CloudWatch config inline for faster streaming
+cat << 'EOF' | sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+{
+    "logs": {
+        "logs_collected": {
+            "files": {
+                "collect_list": [
+                    {
+                        "file_path": "/tmp/app-logs/app.log",
+                        "log_group_name": "techeazy-app-logs",
+                        "log_stream_name": "{instance_id}/app.log",
+                        "timestamp_format": "%Y-%m-%d %H:%M:%S"
+                    },
+                    {
+                        "file_path": "/var/log/cloud-init-output.log",
+                        "log_group_name": "techeazy-system-logs",
+                        "log_stream_name": "{instance_id}/cloud-init-output.log",
+                        "timestamp_format": "%Y-%m-%d %H:%M:%S"
+                    }
+                ]
+            }
+        },
+        "log_stream_name": "{instance_id}",
+        "force_flush_interval": 5
+    },
+    "metrics": {
+        "append_dimensions": {
+            "InstanceId": "$${aws:InstanceId}"
+        },
+        "metrics_collected": {
+            "mem": {
+                "measurement": ["mem_used_percent"],
+                "metrics_collection_interval": 30
+            },
+            "cpu": {
+                "measurement": ["cpu_usage_idle", "cpu_usage_user", "cpu_usage_system"],
+                "metrics_collection_interval": 30,
+                "totalcpu": true
+            }
+        }
+    }
+}
+EOF
+
+echo "Starting CloudWatch agent..."
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+  -s
+
+# Create app log directory early
+sudo mkdir -p /tmp/app-logs
+sudo chmod 755 /tmp/app-logs
+
 # Set the S3 log path from Terraform variable - expand variables immediately
 S3_BUCKET_NAME="${s3_bucket_name}"
 STAGE="${stage}"

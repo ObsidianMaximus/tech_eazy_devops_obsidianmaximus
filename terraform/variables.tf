@@ -18,3 +18,9 @@ variable "stage" {
   description = "Deployment stage"
   type        = string
 }
+
+variable "alert_email" {
+  description = "Email address for CloudWatch alerts"
+  type        = string
+  default     = "PaleProwler@proton.me"
+}
