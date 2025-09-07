@@ -30,6 +30,12 @@ resource "aws_iam_role_policy_attachment" "ec2_s3_write_access" {
   policy_arn = aws_iam_policy.s3_write_policy.arn
 }
 
+# Attach CloudWatch Agent Policy to EC2 Role
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent_attach" {
+  role       = aws_iam_role.ec2_instance_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
 # Create IAM Instance Profile
 resource "aws_iam_instance_profile" "ec2_instance_profile" {
   name = "techeazy-ec2-instance-profile"
